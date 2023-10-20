@@ -1,7 +1,6 @@
 <template>
   <div class="home">
     <!--Hero-->
-    <HeroComponent />
 
     <!--Search-->
     <div class="container search">
@@ -9,18 +8,11 @@
         v-model.lazy="searchInput"
         type="text"
         placeholder="Search"
-        @keyup.enter="$fetch"
+        @keyup.enter="searchMovies"
       />
       <button v-show="searchInput !== ''" class="button" @click="clearSearch">
         Clear Search
       </button>
-    </div>
-
-    <!--WatchList Button-->
-    <div class="container">
-      <NuxtLink class="button watch button-light" :to="{ name: 'watchlist' }">
-        Watch List
-      </NuxtLink>
     </div>
 
     <!--Loading-->
@@ -57,13 +49,9 @@
                 })
               }}
             </p>
-            <NuxtLink
-              class="button button-light"
-              :to="{ name: 'movies-id', params: { id: movie.id } }"
-            >
-              Get More Info
-            </NuxtLink>
-            <button class="button button-light">Add to Watch List</button>
+            <button class="button button-light" @click="deleteMovie(movie.id)">
+              Delete
+            </button>
           </div>
         </div>
       </div>
@@ -93,19 +81,8 @@
                 })
               }}
             </p>
-            <NuxtLink
-              class="button button-light"
-              :to="{ name: 'movies-movieid', params: { id: movie.id } }"
-            >
-              Get More Info
-            </NuxtLink>
-            <button
-              class="button button-light"
-              :disabled="checkIsAdded(movie.id)"
-              @click="addWatchList(movie.id)"
-            >
-              <span v-if="checkIsAdded(movie.id)">Added</span>
-              <span v-else> Add to Watch List </span>
+            <button class="button button-light" @click="deleteMovie(movie.id)">
+              Delete
             </button>
           </div>
         </div>
@@ -123,61 +100,18 @@ export default {
       movies: [],
       searchedMovies: [],
       searchInput: '',
-      watchList: [],
     }
   },
 
   async fetch() {
-    if (this.searchInput === '') {
-      await this.getMovies()
-    }
     await this.getWatchList()
   },
 
-  fetchDelay: 100,
+  onMounted() {
+    this.getWatchList()
+  },
 
   methods: {
-    async getMovies() {
-      const data = axios.get(
-        `https://api.themoviedb.org/3/movie/now_playing?api_key=37ed43a4f8eaa2abd75f9283692947bc&language=en-US&page=1`
-      )
-      const result = await data
-      result.data.results.forEach((movie) => {
-        this.movies.push(movie)
-      })
-    },
-
-    async searchMovies() {
-      const data = await axios.get(
-        `https://api.themoviedb.org/3/search/movie?api_key=37ed43a4f8eaa2abd75f9283692947bc&language=en-US&page=1&query=${this.searchInput}`
-      )
-      const result = await data
-      result.data.results.forEach((movie) => {
-        this.searchedMovies.push(movie)
-      })
-    },
-
-    async addWatchList(id) {
-      const data = axios.post(
-        'https://api.themoviedb.org/3/account/10557011/watchlist',
-        {
-          media_type: 'movie',
-          media_id: id,
-          watchlist: true,
-        },
-        {
-          headers: {
-            accept: 'application/json',
-            'content-type': 'application/json',
-            Authorization:
-              'Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJmNDhjMWJhM2FkN2Y3ZTM1OTFlYjM3YjViMDJhNjcyMSIsInN1YiI6IjYwYjBiMGMwYzVjMWVmMDA1OWU3YWE5ZiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.FjOlMRnhzN533v0F8OuGfEynaMra55OeU6C3-WArzuU',
-          },
-        }
-      )
-      await data
-      await this.getWatchList();
-    },
-
     async getWatchList() {
       const data = axios.get(
         'https://api.themoviedb.org/3/account/10557011/watchlist/movies?language=en-US&page=1&sort_by=created_at.asc',
@@ -191,18 +125,46 @@ export default {
         }
       )
       const result = await data
-      result.data.results.forEach(movie => {
-        this.watchList.push(movie)
+      result.data.results.forEach((movie) => {
+        this.movies.push(movie)
       })
+    },
+
+    async deleteMovie(id) {
+      const data = axios.post(
+        'https://api.themoviedb.org/3/account/10557011/watchlist',
+        {
+          media_type: 'movie',
+          media_id: id,
+          watchlist: false,
+        },
+        {
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            Authorization:
+              'Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJmNDhjMWJhM2FkN2Y3ZTM1OTFlYjM3YjViMDJhNjcyMSIsInN1YiI6IjYwYjBiMGMwYzVjMWVmMDA1OWU3YWE5ZiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.FjOlMRnhzN533v0F8OuGfEynaMra55OeU6C3-WArzuU',
+          },
+        }
+      )
+      await data
+      this.movies = this.movies.filter((movie) => movie.id !== id)
+    },
+
+    searchMovies() {
+      if (this.searchInput.trim() === '') {
+        this.searchedMovies = this.movies
+      } else {
+        const keyword = this.searchInput.trim().toLowerCase()
+        this.searchedMovies = this.movies.filter((movie) => {
+          return movie.title.toLowerCase().includes(keyword)
+        })
+      }
     },
 
     clearSearch() {
       this.searchInput = ''
       this.searchedMovies = []
-    },
-
-    checkIsAdded(id) {
-      return this.watchList.find(movie => movie.id === id)
     },
   },
 }
